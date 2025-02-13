@@ -11,8 +11,8 @@
 #include <main.h>
 #include <WebServer.h>
 
-const char* WIFI_SSID = "TP-LINK_D8DD";
-const char* WIFI_PASSWORD = "43331192";
+const char* WIFI_SSID = "xxx";
+const char* WIFI_PASSWORD = "xxx";
 
 WebServer server(80);
 
