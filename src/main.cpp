@@ -11,8 +11,8 @@
 #include <main.h>
 #include <WebServer.h>
 
-const char* WIFI_SSID = "xxx";
-const char* WIFI_PASSWORD = "xxx";
+const char* WIFI_SSID = "TP-LINK_D8DD";
+const char* WIFI_PASSWORD = "43331192";
 
 WebServer server(80);
 
@@ -25,9 +25,9 @@ Adafruit_SHT4x sht4 = Adafruit_SHT4x();
 
 sensors_event_t humidity, temp;
 
-enum ScreenState { SCREEN1, SCREEN2, SCREEN3, SCREEN4, SCREEN5, SCREEN6, SCREEN7 };
+enum ScreenState { SCREEN1, SCREEN2, SCREEN3, SCREEN4, SCREEN5, SCREEN6, SCREEN7, SCREEN8, SCREEN9, SCREEN10, SCREEN11, SCREEN12 };
 ScreenState currentScreenState = SCREEN1;
-const int NUM_SCREEN_STATES = 7;
+const int NUM_SCREEN_STATES = 12;
 
 int vol;
 int bat_level;
@@ -53,6 +53,21 @@ M5Canvas canvas(&M5.Lcd);  // Создаем буфер для двойной б
 int networksFound = 0;
 const int MAX_NETWORKS = 10;  // Максимальное количество отображаемых сетей
 int currentScroll = 0;  // Для прокрутки списка сетей
+
+// Добавляем структуру для хранения данных о качестве сигнала
+struct SignalQuality {
+    int rssi;
+    int channel;
+    int strength;  // 0-4
+    String encryption;
+    int noiseLevel;
+};
+
+SignalQuality currentSignal;
+
+const int GRAPH_POINTS = 100;
+float tempHistory[GRAPH_POINTS];
+int tempIndex = 0;
 
 void connectToWiFi() {
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -134,6 +149,21 @@ void updateScreen() {
       break;
     case SCREEN7:
       drawScreen7();
+      break;
+    case SCREEN8:
+      drawScreen8();
+      break;
+    case SCREEN9:
+      drawScreen9();
+      break;
+    case SCREEN10:
+      drawScreen10();
+      break;
+    case SCREEN11:
+      drawScreen11();
+      break;
+    case SCREEN12:
+      drawScreen12();
       break;
   }
 }
@@ -525,6 +555,218 @@ void drawScreen7() {
         canvas.drawRect(M5.Lcd.width() - 4, 15, 4, scrollBarHeight, DARKGREY);
         canvas.fillRect(M5.Lcd.width() - 4, thumbY, 4, thumbHeight, WHITE);
     }
+}
+
+String getEncryptionType(wifi_auth_mode_t encryptionType) {
+    switch (encryptionType) {
+        case WIFI_AUTH_OPEN:
+            return "None";
+        case WIFI_AUTH_WEP:
+            return "WEP";
+        case WIFI_AUTH_WPA_PSK:
+            return "WPA";
+        case WIFI_AUTH_WPA2_PSK:
+            return "WPA2";
+        case WIFI_AUTH_WPA_WPA2_PSK:
+            return "WPA+WPA2";
+        default:
+            return "Unknown";
+    }
+}
+
+void drawSignalStrengthMeter(int x, int y, int strength, uint16_t color) {
+    const int barWidth = 4;
+    const int barGap = 2;
+    const int barMaxHeight = 20;
+    
+    for (int i = 0; i < 4; i++) {
+        int barHeight = (i + 1) * 5;
+        if (i < strength) {
+            canvas.fillRect(x + i * (barWidth + barGap), y + (barMaxHeight - barHeight), 
+                          barWidth, barHeight, color);
+        } else {
+            canvas.drawRect(x + i * (barWidth + barGap), y + (barMaxHeight - barHeight), 
+                          barWidth, barHeight, DARKGREY);
+        }
+    }
+}
+
+void drawScreen8() {
+    canvas.setTextSize(1);
+    
+    // Обновляем данные о текущем подключении
+    if (WiFi.status() == WL_CONNECTED) {
+        currentSignal.rssi = WiFi.RSSI();
+        currentSignal.channel = WiFi.channel();
+        currentSignal.strength = map(currentSignal.rssi, -100, -40, 0, 4);
+        currentSignal.noiseLevel = random(-95, -85); // Примерное значение шума
+        
+        // Заголовок
+        canvas.setTextColor(GREEN);
+        canvas.setCursor(0, 0);
+        canvas.printf("Connected to: %s", WiFi.SSID().c_str());
+        
+        // Основная информация
+        canvas.setTextColor(WHITE);
+        
+        // Сигнал
+        canvas.setCursor(0, 15);
+        canvas.print("Signal Strength:");
+        drawSignalStrengthMeter(100, 15, currentSignal.strength, 
+                               currentSignal.strength > 2 ? GREEN : 
+                               currentSignal.strength > 1 ? YELLOW : RED);
+        
+        // RSSI
+        canvas.setCursor(0, 35);
+        canvas.printf("RSSI: %d dBm", currentSignal.rssi);
+        
+        // Канал
+        canvas.setCursor(0, 45);
+        canvas.printf("Channel: %d", currentSignal.channel);
+        
+        // Шум
+        canvas.setCursor(0, 55);
+        canvas.printf("Noise: %d dBm", currentSignal.noiseLevel);
+        
+        // SNR (Signal-to-Noise Ratio)
+        int snr = currentSignal.rssi - currentSignal.noiseLevel;
+        canvas.setCursor(0, 65);
+        canvas.printf("SNR: %d dB", snr);
+        
+        // Качество соединения
+        canvas.setCursor(0, 75);
+        canvas.print("Quality: ");
+        if (snr > 40) {
+            canvas.setTextColor(GREEN);
+            canvas.print("Excellent");
+        } else if (snr > 25) {
+            canvas.setTextColor(GREEN);
+            canvas.print("Good");
+        } else if (snr > 15) {
+            canvas.setTextColor(YELLOW);
+            canvas.print("Fair");
+        } else {
+            canvas.setTextColor(RED);
+            canvas.print("Poor");
+        }
+        
+        // IP адрес
+        canvas.setCursor(0, 95);
+        canvas.printf("IP: %s", WiFi.localIP().toString().c_str());
+        
+    } else {
+        canvas.setTextColor(RED);
+        canvas.setCursor(0, M5.Lcd.height()/2 - 10);
+        canvas.print("Not connected to WiFi");
+    }
+}
+
+void drawScreen9() {
+    canvas.setTextSize(1);
+    
+    // CPU информация
+    canvas.setCursor(0, 0);
+    canvas.printf("CPU Freq: %d MHz", ESP.getCpuFreqMHz());
+    
+    // Память
+    canvas.setCursor(0, 15);
+    canvas.printf("Free RAM: %d KB", ESP.getFreeHeap() / 1024);
+    canvas.setCursor(0, 25);
+    canvas.printf("Total RAM: %d KB", ESP.getHeapSize() / 1024);
+    
+    // Flash память
+    canvas.setCursor(0, 40);
+    canvas.printf("Flash Size: %d MB", ESP.getFlashChipSize() / (1024 * 1024));
+    
+    // Время работы
+    unsigned long uptime = millis() / 1000;
+    int days = uptime / (24 * 3600);
+    int hours = (uptime % (24 * 3600)) / 3600;
+    int minutes = (uptime % 3600) / 60;
+    int seconds = uptime % 60;
+    
+    canvas.setCursor(0, 55);
+    canvas.printf("Uptime: %dd %02d:%02d:%02d", days, hours, minutes, seconds);
+}
+
+void drawScreen10() {
+    // Добавляем новую точку
+    tempHistory[tempIndex] = temp.temperature - 5;
+    tempIndex = (tempIndex + 1) % GRAPH_POINTS;
+    
+    // Находим min и max для масштабирования
+    float minTemp = tempHistory[0];
+    float maxTemp = tempHistory[0];
+    for(int i = 1; i < GRAPH_POINTS; i++) {
+        if(tempHistory[i] < minTemp) minTemp = tempHistory[i];
+        if(tempHistory[i] > maxTemp) maxTemp = tempHistory[i];
+    }
+    
+    // Отрисовка графика
+    const int graphHeight = 100;
+    const int graphWidth = M5.Lcd.width() - 20;
+    const int graphY = 120;
+    
+    for(int i = 0; i < GRAPH_POINTS-1; i++) {
+        int x1 = 10 + (i * graphWidth / GRAPH_POINTS);
+        int x2 = 10 + ((i+1) * graphWidth / GRAPH_POINTS);
+        int y1 = graphY - (tempHistory[i] - minTemp) * graphHeight / (maxTemp - minTemp);
+        int y2 = graphY - (tempHistory[(i+1)] - minTemp) * graphHeight / (maxTemp - minTemp);
+        
+        canvas.drawLine(x1, y1, x2, y2, WHITE);
+    }
+    
+    // Текущая температура крупно
+    canvas.setTextSize(2);
+    canvas.setCursor(0, 10);
+    canvas.printf("%.1f C", temp.temperature - 5);
+}
+
+void drawScreen11() {
+    canvas.setTextSize(1);
+    
+    // Центр экрана
+    int centerX = M5.Lcd.width() / 2;
+    int centerY = M5.Lcd.height() / 2;
+    int radius = min(centerX, centerY) - 20;
+    
+    // Рисуем круг компаса
+    canvas.drawCircle(centerX, centerY, radius, WHITE);
+    
+    // Рисуем стрелку на основе акселерометра
+    float angle = atan2(accY, accX);
+    int arrowX = centerX + cos(angle) * radius;
+    int arrowY = centerY + sin(angle) * radius;
+    
+    canvas.drawLine(centerX, centerY, arrowX, arrowY, RED);
+    
+    // Выводим значения ускорения
+    canvas.setCursor(0, 0);
+    canvas.printf("X: %.2f", accX);
+    canvas.setCursor(0, 10);
+    canvas.printf("Y: %.2f", accY);
+    canvas.setCursor(0, 20);
+    canvas.printf("Z: %.2f", accZ);
+}
+
+void drawScreen12() {
+    canvas.setTextSize(1);
+    canvas.setCursor(0, 0);
+    canvas.println("Scan to connect:");
+    
+    // Генерируем URL для QR-кода
+    String url = "http://" + WiFi.localIP().toString();
+    
+    // Создаем QR код
+    const int qrSize = min(M5.Lcd.width(), M5.Lcd.height()) - 40;
+    const int qrX = (M5.Lcd.width() - qrSize) / 2;
+    const int qrY = 20;
+
+    // Рисуем QR код
+    canvas.qrcode(url, qrX, qrY, qrSize, 2);
+    
+    canvas.setCursor(0, M5.Lcd.height() - 20);
+    canvas.println(url);
 }
 
 void setup() {

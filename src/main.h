@@ -20,3 +20,8 @@ void drawScreen4();
 void drawScreen5();
 void drawScreen6();
 void drawScreen7();
+void drawScreen8();
+void drawScreen9();
+void drawScreen10();
+void drawScreen11();
+void drawScreen12();
